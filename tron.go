@@ -209,11 +209,8 @@ var chatTmpl = template.Must(template.ParseFiles(fmt.Sprintf("%s/tmpl/chat.html"
 func chat(w http.ResponseWriter, r *http.Request) {
 	page := struct {
 		IP string
-	}{}
-	if AppID == "" {
-		page.IP = "127.0.0.1"
-	} else {
-		page.IP, _ = aws.PublicIPv4()
+	}{
+		IP: PublicIPv4(),
 	}
 	chatTmpl.Execute(w, page)
 }
@@ -221,6 +218,19 @@ func chat(w http.ResponseWriter, r *http.Request) {
 var rootTmpl = template.Must(template.ParseFiles(fmt.Sprintf("%s/tmpl/index.html", assetsPath)))
 
 func root(w http.ResponseWriter, r *http.Request) {
-	page := struct{}{}
+	page := struct {
+		IP string
+		}{
+			IP: PublicIPv4(),
+		}
 	rootTmpl.Execute(w, page)
+}
+
+func PublicIPv4() string {
+	if AppID == "" {
+		return "web1.tunnlr.com:11630"
+	} else {
+		ip, _ := aws.PublicIPv4()
+		return ip
+	}
 }
