@@ -2,8 +2,11 @@ package tron
 
 import (
 	"fmt"
+  "math/rand"
 	"sync"
 	"time"
+  
+  "github.com/golang/glog"
 )
 
 type Color string
@@ -166,6 +169,14 @@ func (a *Arena) Update(acts map[Color]Direction) {
 		}
 
 		// Check collisions
+    shouldProfile := false
+    if rand.Intn(60) == 0 {
+      shouldProfile = true
+    }
+    var t int64
+    if shouldProfile {
+      t = time.Now().UnixNano()
+    }
 		for otherColor, points := range a.Points {
 			_, ok := points[p]
 			if ok {
@@ -173,6 +184,9 @@ func (a *Arena) Update(acts map[Color]Direction) {
 				break
 			}
 		}
+    if shouldProfile {
+      glog.Infof("collision time spent: %d ns", time.Now().UnixNano() - t)
+    }
 		a.Points[color][p] = struct{}{}
 	}
 }
