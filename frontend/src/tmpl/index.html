@@ -38,7 +38,28 @@
     var DOM = {};
     DOM.map   = document.getElementById('map');
     DOM.error = document.getElementById('error');
-    DOM.color = document.getElementById('color')
+    DOM.color = document.getElementById('color');
+    
+    var page = {{.}};
+    
+    function wsURL(path) {
+      var loc = window.location, newURL;
+      if (loc.protocol === "https:") {
+        newURL = "wss:";
+      } else {
+        newURL = "ws:";
+      }
+      // Elastic Load Balancer does not support websockets, thus the host cannot be loc.host.
+      var host = page.IP;
+      if (!host.match(/:/)) {
+        if (loc.port != "80" && loc.port != "443") {
+          host += ":" + loc.port;
+        }
+      }
+      newURL += "//" + host;
+      newURL += path;
+      return newURL;
+    }
     
     // mapState, playerColor, playerState ('wait', '5'..'1', 'play', 'won', 'lost')
     
@@ -83,7 +104,7 @@
     
     // --- SOCKETS SETUP -----------------------------------
     
-    var webSocketURL = 'ws://localhost:8080/Join';
+    var webSocketURL = wsURL("/Join");
     var socket       = new WebSocket(webSocketURL);
     var roomName     = 'tron';
     var playerColor;
