@@ -39,10 +39,11 @@ type wsData struct {
 type WSConnected struct {
 	Type  string
 	Color Color
+	OtherColors []Color
 }
 
-func NewWSConnected(color Color) WSConnected {
-	return WSConnected{Type: "Connected", Color: color}
+func NewWSConnected(color Color, otherColors []Color) WSConnected {
+	return WSConnected{Type: "Connected", Color: color, OtherColors: otherColors}
 }
 
 type WSRefreshMap struct {
@@ -89,6 +90,26 @@ func NewWSCountdown(cnt int) WSCountdown {
 	return WSCountdown{Type: "Countdown", Cnt: cnt}
 }
 
+func OtherColors(others []Color, color Color) []Color {
+	res := make([]Color, 0)
+	for _, c := range others {
+		if c != color {
+			res = append(res, c)
+		}
+	}
+	return res
+}
+
+func OtherColorsFromGame(g *Game, color Color) []Color {
+	res := make([]Color, 0)
+	for c, _ := range g.Players {
+		if c != color {
+			res = append(res, c)
+		}
+	}
+	return res
+}
+
 func Join(ws *websocket.Conn) {
 	data := struct {
 		Body struct {
@@ -100,8 +121,9 @@ func Join(ws *websocket.Conn) {
 	}
 	me := &Player{
 		Arena:     make(chan *Arena, 32),
-		GameEnd:   make(chan Color, 32),
+		GameEnd:   make(chan Color, 4),
 		Countdown: make(chan int, 4),
+		Connected: make(chan []Color, 4),
 	}
 	room, err := hall.EnterRoom(data.Body.Room, me)
 	if err != nil {
@@ -110,6 +132,8 @@ func Join(ws *websocket.Conn) {
 		// We are just a watcher
 		hall.WatchRoom(data.Body.Room, me)
 		defer hall.UnwatchRoom(data.Body.Room, me)
+		tick := time.NewTicker(30 * time.Second)
+		defer tick.Stop()
 		for {
 			select {
 			case cnt := <-me.Countdown:
@@ -124,12 +148,16 @@ func Join(ws *websocket.Conn) {
 				if err := websocket.JSON.Send(ws, NewWSGameEnd(ge)); err != nil {
 					return
 				}
+			case <-tick.C:
+				if err := websocket.JSON.Send(ws, struct{HB int}{HB: 0}); err != nil {
+					return
+				}
 			}
 		}
 	}
 	defer hall.LeaveRoom(data.Body.Room, me)
 	game, color := room.Ready(me)
-	if err := websocket.JSON.Send(ws, NewWSConnected(color)); err != nil {
+	if err := websocket.JSON.Send(ws, NewWSConnected(color, OtherColorsFromGame(game, color))); err != nil {
 		return
 	}
 
@@ -146,7 +174,7 @@ func Join(ws *websocket.Conn) {
 				return
 			case "Ready":
 				game, color = room.Ready(me)
-				if err := websocket.JSON.Send(ws, NewWSConnected(color)); err != nil {
+				if err := websocket.JSON.Send(ws, NewWSConnected(color, OtherColorsFromGame(game, color))); err != nil {
 					return
 				}
 			case "Move":
@@ -165,6 +193,8 @@ func Join(ws *websocket.Conn) {
 		}
 	}()
 
+	tick := time.NewTicker(30 * time.Second)
+	defer tick.Stop()
 	for {
 		select {
 		case cnt := <-me.Countdown:
@@ -179,8 +209,17 @@ func Join(ws *websocket.Conn) {
 			if err := websocket.JSON.Send(ws, NewWSGameEnd(ge)); err != nil {
 				return
 			}
+		case others := <-me.Connected:
+		glog.Infof("websocket Connected %+v %+v", color, game)
+			if err := websocket.JSON.Send(ws, NewWSConnected(color, OtherColors(others, color))); err != nil {
+				return
+			}
 		case <-readStopped:
 			return
+		case <-tick.C:
+			if err := websocket.JSON.Send(ws, struct{HB int}{HB: 0}); err != nil {
+				return
+			}
 		}
 	}
 }
