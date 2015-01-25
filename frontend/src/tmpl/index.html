@@ -16,7 +16,7 @@
       float: left;
       margin-left: 20px;
     }
-    #connection, #color, #winner, #error {
+    #tutorial, #connection, #color, #winner, #error {
       margin-top: 20px;
     }
     #color, #winner, #error {
@@ -133,7 +133,7 @@
     }
     
     function displayColor(Color) {
-      if (Color != "") {
+      if (Color && Color != "") {
         DOM.color.style.color = Color;
         DOM.color.innerHTML   = 'You are ' + Color;
       }
