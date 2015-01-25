@@ -1,0 +1,137 @@
+<html>
+
+<head>
+  <style>
+    body {
+      padding: 20px;
+    }
+    #map {
+      float: left;
+      width: 1000px;
+      height: 600px;
+      border: 3px solid black;
+    }
+    #player-state {
+      float: left;
+      font-family: sans-serif;
+      font-size: 36px;
+    }
+  </style>
+</head>
+
+<body>
+  
+  <canvas id="map" width="1000", height="600"></canvas>
+  <div id="player-state"></div>
+  
+  <script>
+    var DOM = {};
+    DOM.map         = document.getElementById('map');
+    DOM.playerState = document.getElementById('player-state');
+  
+  
+    var mapState = {
+      orange: [
+        [333,200], [333,300], [200,300], [200,100]
+      ],
+      blue : [
+        [666,200], [800,200], [800,50], [900,50]
+      ],
+      red: [
+        [333,400], [100, 400], [100, 580], [200, 580]
+      ],
+      green: [
+        [666,400], [850,400], [850,575], [950, 575]
+      ]
+    }
+    
+    var drawMap = function(mapState) {
+      var ctx = DOM.map.getContext('2d');
+      
+      ctx.lineWidth = 1;
+      
+      for (var color in mapState) {
+        if (mapState.hasOwnProperty(color)) {
+          
+          ctx.beginPath();
+          ctx.strokeStyle = color;
+          
+          var coords = mapState[color];
+          ctx.moveTo(coords[0][0], coords[0][1]);
+          for (i = 1; i < coords.length; i++) { 
+            ctx.lineTo(coords[i][0], coords[i][1]);
+          }
+          
+          ctx.stroke();
+          ctx.closePath();
+        }
+      }
+    }
+    
+    drawMap(mapState);
+    
+    
+    // --- WebSockets -----------------------------------
+    var webSocketURL = 'ws://54.68.173.41/chatWS'
+    var socket       = new WebSocket(webSocketURL);
+    // var playerColor;
+    // var playerState;
+    var playerColor = 'BLUE';  // tmp
+    var playerState = 'PLAY';  // tmp
+    
+    socket.onopen = function() {
+      socket.send('New player!');
+    }
+    
+    socket.onmessage = function(event) {
+      drawMap(event.mapState);
+      
+      if (!playerColor) {
+        playerColor = event.playerColor;
+      }
+      
+      if (playerState != event.playerState) {
+        playerState = event.playerState;
+        DOM.playerState.innerHTML = playerState;
+      }
+    }
+    
+    document.onkeydown = sendEvent;
+    
+    function sendEvent(e) {
+      if (playerColor && playerState == 'PLAY') {
+        e = e || window.event;
+        var direction;
+        
+        switch(e.keyCode) {
+          case 37:
+            direction = 'L';
+            break;
+          case 38:
+            direction = 'U';
+            break;
+          case 39:
+            direction = 'R';
+            break;
+          case 40:
+            direction = 'D';
+            break;
+        }
+        
+        // socket.send(composeEvent(direction));
+        console.log(composeEvent(direction));  // tmp
+        
+      }      
+    }
+    
+    function composeEvent(direction) {
+      var msg = {
+        playerColor: playerColor,
+        direction:   direction
+      }
+      return JSON.stringify(msg);
+    }
+  </script>
+  
+</body>
+</html>

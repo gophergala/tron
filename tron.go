@@ -92,6 +92,9 @@ func chat(w http.ResponseWriter, r *http.Request) {
 	chatTmpl.Execute(w, page)
 }
 
+var rootTmpl = template.Must(template.ParseFiles(fmt.Sprintf("%s/tmpl/index.html", assetsPath)))
+
 func root(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("hello world!"))
+	page := struct{}{}
+	rootTmpl.Execute(w, page)
 }
