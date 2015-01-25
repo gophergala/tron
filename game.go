@@ -39,8 +39,8 @@ type MoveCmd struct {
 }
 
 type Point struct {
-	X float64
-	Y float64
+	X int
+	Y int
 }
 
 type Loser struct {
@@ -54,15 +54,23 @@ type Arena struct {
 	Losers []Loser
 
 	Size Point
+  Ratio float64
 }
 
-func NewArena(snakes map[Color][]Point) *Arena {
+const (
+  DefaultSizeX = 1000
+  DefaultSizeY = 600
+  DefaultSizeRatio = 8
+)
+
+func NewArena(snakes map[Color][]Point, ratio float64) *Arena {
 	a := Arena{
 		Snakes: snakes,
 		Points: make(map[Color]map[Point]struct{}),
 		Losers: make([]Loser, 0),
-		Size:   Point{X: 1000, Y: 600},
+    Ratio:  ratio,
 	}
+  a.Size = Point{X: int(DefaultSizeX/a.Ratio), Y: int(DefaultSizeY/a.Ratio)}
 	for color, s := range snakes {
 		a.Points[color] = make(map[Point]struct{})
 		for _, point := range s {
@@ -343,15 +351,16 @@ var initColors = []Point{
 func (g *Game) Start() {
 	// Select initial direction
 	snakes := make(map[Color][]Point)
+  var ratio float64 = DefaultSizeRatio
 	i := 0
 	for color, _ := range g.Players {
 		s := make([]Point, 2)
-		s[0] = initColors[i]
+		s[0] = Point{X: int(float64(initColors[i].X)/ratio), Y: int(float64(initColors[i].Y)/ratio)}
 		s[1] = Point{s[0].X + 1, s[0].Y}
 		snakes[color] = s
 		i += 1
 	}
-	arena := NewArena(snakes)
+	arena := NewArena(snakes, ratio)
 
 	timer := time.After(3 * time.Second)
 InitDirt:

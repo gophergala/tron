@@ -55,8 +55,8 @@ func NewWSRefreshMap(arena *Arena) WSRefreshMap {
 	for color, snake := range arena.Snakes {
 		canvas[color] = make([]Point, len(snake))
 		for i := 0; i < len(canvas[color]); i++ {
-			canvas[color][i].X = snake[i].X
-			canvas[color][i].Y = arena.Size.Y - snake[i].Y
+			canvas[color][i].X = int(float64(snake[i].X) * arena.Ratio)
+			canvas[color][i].Y = int(float64(arena.Size.Y - snake[i].Y) * arena.Ratio)
 		}
 	}
 	return WSRefreshMap{Type: "RefreshMap", State: canvas}
