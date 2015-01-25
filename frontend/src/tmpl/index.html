@@ -11,10 +11,11 @@
       height: 600px;
       border: 3px solid black;
     }
-    #player-state {
+    #error {
       float: left;
       font-family: sans-serif;
       font-size: 36px;
+      color: red;
     }
   </style>
 </head>
@@ -22,31 +23,30 @@
 <body>
   
   <canvas id="map" width="1000", height="600"></canvas>
-  <div id="player-state"></div>
+  <div id="error"></div>
   
   <script>
     var DOM = {};
-    DOM.map         = document.getElementById('map');
-    DOM.playerState = document.getElementById('player-state');
-    
+    DOM.map   = document.getElementById('map');
+    DOM.error = document.getElementById('error');
     
     // mapState, playerColor, playerState ('wait', '5'..'1', 'play', 'won', 'lost')
     
-    var mapState = {
-      orange: [
-        [333,200], [333,300], [200,300], [200,100]
-      ],
-      blue : [
-        [666,200], [800,200], [800,50], [900,50]
-      ],
-      red: [
-        [333,400], [100, 400], [100, 580], [200, 580]
-      ],
-      green: [
-        [666,400], [850,400], [850,575], [950, 575]
-      ]
-    }
-    
+    // var mapState = {
+    //   orange: [
+    //     [333,200], [333,300], [200,300], [200,100]
+    //   ],
+    //   blue : [
+    //     [666,200], [800,200], [800,50], [900,50]
+    //   ],
+    //   red: [
+    //     [333,400], [100, 400], [100, 580], [200, 580]
+    //   ],
+    //   green: [
+    //     [666,400], [850,400], [850,575], [950, 575]
+    //   ]
+    // }
+    // 
     var drawMap = function(mapState) {
       var ctx = DOM.map.getContext('2d');
       
@@ -70,45 +70,49 @@
       }
     }
     
-    drawMap(mapState);
-    
     
     // --- SOCKETS SETUP -----------------------------------
     
-    var webSocketURL = 'ws://localhost:8080/chatWS'
+    var webSocketURL = 'ws://localhost:8080/Join'
     var socket       = new WebSocket(webSocketURL);
-    // var playerColor;
-    // var playerState;
-    var playerColor = 'blue';  // tmp
-    var playerState = 'play';  // tmp
+    var roomName     = 'tron'
+    
+    var playerColor;
+    // var playerColor = 'blue';  // tmp
     
     socket.onopen = function() {
-      socket.send(composeReadyEvent());
+      socket.send(composeJoinMessage(roomName));
       
       window.onbeforeunload = function() {
         socket.close();
       }
     }
     
-    socket.onmessage = function(event) {
-      drawMap(event.mapState);
+    socket.onmessage = function(msgJSON) {
+      var msg = JSON.parse(msgJSON);
       
-      if (playerState != event.playerState) {
-        playerState = event.playerState;
-        DOM.playerState.innerHTML = playerState;
-        
-        if (playerState == 'play') {
-          playerColor = event.playerColor;
-          document.onkeydown = sendKeyEvent;
-        }
+      switch(msg.type) {
+        case 'Ready':
+          playerColor = msg.Color;
+          // display which color belongs to the player
+          document.onkeydown = sendKeyMessage;
+          break;
+        case 'RefreshMap':
+          drawMap(msg.State);
+          break;
+        case 'Error':
+          displayErrorMessage(msg.Msg);
+          break;
       }
     }
     
-    function sendKeyEvent(e) {
-      if (playerColor && playerState == 'play') {
+    function displayErrorMessage(Msg) {
+      DOM.error.innerHTML = Msg;
+    }
+    
+    function sendKeyMessage(e) {
         e = e || window.event;
         var direction;
-        
         switch(e.keyCode) {
           case 37:
             direction = 'l';
@@ -123,24 +127,24 @@
             direction = 'd';
             break;
         }
-        
-        // socket.send(composeEvent(direction));
-        console.log(composeKeyEvent(direction));  // tmp
-        
-      }      
+        socket.send(composeKeyMessage(direction));
+        // console.log(composeKeyMessage(direction));  // tmp
     }
     
     // --- COMPOSE EVENT MESSAGES -------------------------
     
-    function composeReadyEvent() {
-      var msg = { type: 'ready' }
+    function composeJoinMessage(roomName) {
+      var msg = {
+        Type: 'Join' ,
+        Room: roomName
+      }
       return JSON.stringify(msg);
     }
     
-    function composeKeyEvent(direction) {
+    function composeKeyMessage(direction) {
       var msg = {
-        type:        'key'
-        direction:   direction
+        Type:      'Move' ,
+        Direction: direction
       }
       return JSON.stringify(msg);
     }
