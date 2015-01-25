@@ -116,14 +116,14 @@
       DOM.error.innerHTML = '';
     }
     
-    function displayConnectedMessage(OtherColors) {
-      if (OtherColors.length == 3) {
-        DOM.connection.innerHTML = 'You are connected. Game is about to start...'
-      }
-      else {
-        DOM.connection.innerHTML = 'You are connected. Please wait for 3 other players.'
-      }
-    }
+    // function displayConnectedMessage(OtherColors) {
+    //   if (OtherColors.length == 3) {
+    //     DOM.connection.innerHTML = 'You are connected. Game is about to start...'
+    //   }
+    //   else {
+    //     DOM.connection.innerHTML = 'You are connected. Please wait for 3 other players.'
+    //   }
+    // }
     
     function displayCountdown(Cnt) {
       clearMap();
@@ -182,7 +182,6 @@
       switch(msg.Type) {
         case 'Connected':
           playerColor = msg.Color;
-          displayConnectedMessage(msg.OtherColors);
           displayColor(playerColor);
           break;
         case 'Countdown':
