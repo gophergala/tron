@@ -200,11 +200,9 @@ func (a *Arena) Update(acts map[Color]Direction) {
 }
 
 type Player struct {
-  Color Color
 	Arena     chan *Arena
 	GameEnd   chan Color // this is the color of the winner
 	Countdown chan int
-  Connected chan []Color
 }
 
 type Room struct {
@@ -241,7 +239,6 @@ func (r *Room) Ready(player *Player) (*Game, Color) {
 		}
 	}
 	game.Players[color] = player
-  player.Color = color
 
 	if len(game.Players) >= game.MinPlayers {
 		game.Watchers = r.Watchers
@@ -270,22 +267,10 @@ func (h *Hall) EnterRoom(name string, player *Player) (*Room, error) {
 	}
 	room.Players[player] = struct{}{}
 
-    others := make([]Color, 0)
-    for p, _ := range room.Players{
-      others = append(others, p.Color)
-    }
-  for p, _ := range room.Players {
-    select {
-      case p.Connected <- others:
-        default:
-    }
-  }
-
 	return room, nil
 }
 
 func (h *Hall) LeaveRoom(name string, player *Player) {
-  glog.Infof("LEAVELEAVEROOM %s %+v", name, player)
 	h.Lock()
 	defer h.Unlock()
 	room, ok := h.m[name]
@@ -297,18 +282,6 @@ func (h *Hall) LeaveRoom(name string, player *Player) {
 	if len(room.Players) == 0 {
 		delete(h.m, name)
 	}
-
-  glog.Infof("broadcasting LEAVEROOM")
-  others := make([]Color, 0)
-  for p, _ := range room.Players{
-    others = append(others, p.Color)
-  }
-  for p, _ := range room.Players {
-    select {
-      case p.Connected <- others:
-      default:
-    }
-  }
 }
 
 func (h *Hall) WatchRoom(name string, player *Player) error {
