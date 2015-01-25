@@ -4,6 +4,7 @@
   <style>
     body {
       padding: 20px;
+      font-family: sans-serif;
     }
     #map {
       float: left;
@@ -11,9 +12,13 @@
       height: 600px;
       border: 3px solid black;
     }
-    #error {
+    #info {
       float: left;
-      font-family: sans-serif;
+    }
+    #color {
+      font-size: 36px;
+    }
+    #error {
       font-size: 36px;
       color: red;
     }
@@ -23,12 +28,17 @@
 <body>
   
   <canvas id="map" width="1000", height="600"></canvas>
-  <div id="error"></div>
+  <div id="info">
+    <div id="color"></div>
+    <div id="error"></div>
+  </div>
+  
   
   <script>
     var DOM = {};
     DOM.map   = document.getElementById('map');
     DOM.error = document.getElementById('error');
+    DOM.color = document.getElementById('color')
     
     // mapState, playerColor, playerState ('wait', '5'..'1', 'play', 'won', 'lost')
     
@@ -90,9 +100,12 @@
       
       var msg = JSON.parse(wsMsg.data);
       
+      console.log(msg);
+      
       switch(msg.Type) {
         case 'Ready':
           playerColor = msg.Color;
+          displayColor(msg.Color);
           // display which color belongs to the player
           document.onkeydown = sendKeyMessage;
           break;
@@ -103,6 +116,11 @@
           displayErrorMessage(msg.Msg);
           break;
       }
+    }
+    
+    function displayColor(Color) {
+      DOM.color.style.color = Color;
+      DOM.color.innerHTML = Color;
     }
     
     function displayErrorMessage(Msg) {
