@@ -33,6 +33,9 @@
   <canvas id="map" width="1000", height="600"></canvas>
   
   <div id="info">
+    <div id="tutorial">
+      This is a TRON game for at least (and at most!) 4 players.
+    </div>
     <div id="connection"></div>
     <div id="color"></div>
     <div id="winner"></div>
@@ -107,13 +110,19 @@
     
     function clearEverything() {
       clearMap();
+      DOM.connection.innerHTML = '';
       DOM.color.innerHTML = '';
       DOM.winner.innerHTML = '';
       DOM.error.innerHTML = '';
     }
     
-    function displayConnectedMessage() {
-      DOM.connection.innerHTML = 'You are connected. Please wait for the game to start.'
+    function displayConnectedMessage(OtherColors) {
+      if (OtherColors.length == 3) {
+        DOM.connection.innerHTML = 'You are connected. Game is about to start...'
+      }
+      else {
+        DOM.connection.innerHTML = 'You are connected. Please wait for 3 other players.'
+      }
     }
     
     function displayCountdown(Cnt) {
@@ -124,8 +133,14 @@
     }
     
     function displayColor(Color) {
-      DOM.color.style.color = Color || 'black';
-      DOM.color.innerHTML = Color || 'You are a spectator';
+      if (Color != "") {
+        DOM.color.style.color = Color;
+        DOM.color.innerHTML   = 'You are ' + Color;
+      }
+      else {
+        DOM.color.style.color = 'black';
+        DOM.color.innerHTML   = 'You are a spectator';
+      }
     }
     
     function displayWinner(Winner) {
@@ -166,8 +181,9 @@
       
       switch(msg.Type) {
         case 'Connected':
-          displayConnectedMessage();
           playerColor = msg.Color;
+          displayConnectedMessage(msg.OtherColors);
+          displayColor(playerColor);
           break;
         case 'Countdown':
           clearEverything();
