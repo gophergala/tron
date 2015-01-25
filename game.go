@@ -10,6 +10,8 @@ type Color string
 
 var Colors = []Color{"blue", "red", "green", "orange", "black", "purple"}
 
+const ColorWall = "wall"
+
 type JoinCmd struct {
 	ColorC chan Color
 	ArenaC chan Arena
@@ -38,13 +40,31 @@ type Point struct {
 	Y float64
 }
 
+type Loser struct {
+	Color       Color
+	CollideWith Color
+}
+
 type Arena struct {
 	Snakes map[Color][]Point
+	Points map[Color]map[Point]struct{}
+	Losers []Loser
+
+	Size Point
 }
 
 func NewArena(snakes map[Color][]Point) *Arena {
 	a := Arena{
 		Snakes: snakes,
+		Points: make(map[Color]map[Point]struct{}),
+		Losers: make([]Loser, 0),
+		Size:   Point{X: 1000, Y: 600},
+	}
+	for color, s := range snakes {
+		a.Points[color] = make(map[Point]struct{})
+		for _, point := range s {
+			a.Points[color][point] = struct{}{}
+		}
 	}
 	return &a
 }
@@ -56,6 +76,8 @@ func (a *Arena) ChangeInitDirt(cmd MoveCmd) bool {
 	changed := false
 	if cmd.Direction != prevDirt {
 		changed = true
+
+		delete(a.Points[cmd.Color], snake[1])
 		first := snake[0]
 		switch cmd.Direction {
 		case DirectionUp:
@@ -67,6 +89,7 @@ func (a *Arena) ChangeInitDirt(cmd MoveCmd) bool {
 		case DirectionRight:
 			snake[1] = Point{X: first.X + 1, Y: first.Y}
 		}
+		a.Points[cmd.Color][snake[1]] = struct{}{}
 	}
 	return changed
 }
@@ -91,12 +114,30 @@ func computeDirection(snake []Point) Direction {
 	return prevDirt
 }
 
+func oppositeDirections(a, b Direction) bool {
+	if (a == DirectionUp && b == DirectionDown) || (a == DirectionDown && b == DirectionUp) || (a == DirectionLeft && b == DirectionRight) || (a == DirectionRight && b == DirectionLeft) {
+		return true
+	}
+	return false
+}
+
 // Update updates the state of an arena for a timestep.
 func (a *Arena) Update(acts map[Color]Direction) {
 	for color, snake := range a.Snakes {
+		lost := false
+		for _, l := range a.Losers {
+			if l.Color == color {
+				lost = true
+				break
+			}
+		}
+		if lost {
+			continue
+		}
+
 		prevDirt := computeDirection(snake)
 		dirt := prevDirt
-		if act, ok := acts[color]; ok {
+		if act, ok := acts[color]; ok && !oppositeDirections(act, prevDirt) {
 			dirt = act
 		}
 
@@ -112,27 +153,32 @@ func (a *Arena) Update(acts map[Color]Direction) {
 		case DirectionRight:
 			p = Point{X: last.X + 1, Y: last.Y}
 		}
+
+		if p.X <= 0 || p.X >= a.Size.X || p.Y <= 0 || p.Y >= a.Size.Y {
+			a.Losers = append(a.Losers, Loser{Color: color, CollideWith: ColorWall})
+			continue
+		}
 		if dirt != prevDirt {
 			a.Snakes[color] = append(snake, p)
 		} else {
 			a.Snakes[color][len(snake)-1] = p
 		}
-	}
-}
 
-func (a *Arena) Ended() bool {
-	// TODO
-	for _, snake := range a.Snakes {
-		if len(snake) > 5 {
-			return true
+		// Check collisions
+		for otherColor, points := range a.Points {
+			_, ok := points[p]
+			if ok {
+				a.Losers = append(a.Losers, Loser{Color: color, CollideWith: otherColor})
+				break
+			}
 		}
+		a.Points[color][p] = struct{}{}
 	}
-	return false
 }
 
 type Player struct {
 	Arena   chan *Arena
-	GameEnd chan struct{}
+	GameEnd chan Color // this is the color of the winner
 }
 
 type Room struct {
@@ -225,6 +271,21 @@ func NewGame(minPlayers int) *Game {
 	return &game
 }
 
+func (g *Game) Ended(a *Arena) bool {
+	if len(g.Players)-1 == len(a.Losers) {
+		return true
+	}
+	return false
+
+	// TODO
+	for _, snake := range a.Snakes {
+		if len(snake) > 5 {
+			return true
+		}
+	}
+	return false
+}
+
 func (g *Game) broadcastArena(arena *Arena) {
 	for _, p := range g.Players {
 		select {
@@ -234,10 +295,24 @@ func (g *Game) broadcastArena(arena *Arena) {
 	}
 }
 
-func (g *Game) broadcastGameEnd() {
+func (g *Game) broadcastGameEnd(arena *Arena) {
+	var winner Color
+	for color, _ := range g.Players {
+		lost := false
+		for _, loser := range arena.Losers {
+			if loser.Color == color {
+				lost = true
+			}
+		}
+		if !lost {
+			winner = color
+			break
+		}
+	}
+
 	for _, p := range g.Players {
 		select {
-		case p.GameEnd <- struct{}{}:
+		case p.GameEnd <- winner:
 		default:
 		}
 	}
@@ -292,8 +367,8 @@ InitDirt:
 		arena.Update(acts)
 		g.broadcastArena(arena)
 
-		if arena.Ended() {
-			g.broadcastGameEnd()
+		if g.Ended(arena) {
+			g.broadcastGameEnd(arena)
 			return
 		}
 	}
