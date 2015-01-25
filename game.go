@@ -156,21 +156,22 @@ func (r *Room) Ready(player *Player) (*Game, Color) {
 	if r.Game == nil {
 		r.Game = NewGame(r.MaxPlayers)
 	}
+	game := r.Game
 
 	var color Color
 	for _, c := range Colors {
-		if _, ok := r.Game.Players[c]; !ok {
+		if _, ok := game.Players[c]; !ok {
 			color = c
 			break
 		}
 	}
-	r.Game.Players[color] = player
+	game.Players[color] = player
 
-	if len(r.Game.Players) >= r.Game.MinPlayers {
-		go r.Game.Start()
+	if len(game.Players) >= game.MinPlayers {
+		go game.Start()
 		r.Game = nil
 	}
-	return r.Game, color
+	return game, color
 }
 
 type Hall struct {
