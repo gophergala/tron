@@ -54,6 +54,15 @@ func NewWSRefreshMap(arena *Arena) WSRefreshMap {
 	return WSRefreshMap{Type: "RefreshMap", State: arena.Snakes}
 }
 
+type WSGameEnd struct {
+	Type   string
+	Winner Color
+}
+
+func NewWSGameEnd(winner Color) WSGameEnd {
+	return WSGameEnd{Type: "GameEnd", Winner: winner}
+}
+
 type WSError struct {
 	Type string
 	Msg  string
@@ -74,7 +83,7 @@ func Join(ws *websocket.Conn) {
 	}
 	me := &Player{
 		Arena:   make(chan *Arena),
-		GameEnd: make(chan struct{}),
+		GameEnd: make(chan Color),
 	}
 	room, err := hall.EnterRoom(data.Body.Room, me)
 	if err != nil {
@@ -126,7 +135,7 @@ func Join(ws *websocket.Conn) {
 				return
 			}
 		case ge := <-me.GameEnd:
-			if err := websocket.JSON.Send(ws, ge); err != nil {
+			if err := websocket.JSON.Send(ws, NewWSGameEnd(ge)); err != nil {
 				return
 			}
 		case <-readStopped:
