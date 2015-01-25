@@ -22,10 +22,10 @@ type LeaveCmd struct {
 type Direction string
 
 const (
-	DirectionUp    = "up"
-	DirectionDown  = "down"
-	DirectionLeft  = "left"
-	DirectionRight = "right"
+	DirectionUp    = "u"
+	DirectionDown  = "d"
+	DirectionLeft  = "l"
+	DirectionRight = "r"
 )
 
 type MoveCmd struct {
