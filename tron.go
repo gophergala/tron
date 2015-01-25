@@ -65,7 +65,9 @@ func NewWSError(msg string) WSError {
 
 func Join(ws *websocket.Conn) {
 	data := struct {
-		Room string
+		Body struct {
+			Room string
+		}
 	}{}
 	if err := websocket.JSON.Receive(ws, &data); err != nil {
 		return
@@ -74,12 +76,12 @@ func Join(ws *websocket.Conn) {
 		Arena:   make(chan *Arena),
 		GameEnd: make(chan struct{}),
 	}
-	room, err := hall.EnterRoom(data.Room, me)
+	room, err := hall.EnterRoom(data.Body.Room, me)
 	if err != nil {
 		websocket.JSON.Send(ws, NewWSError(err.Error()))
 		return
 	}
-	defer hall.LeaveRoom(data.Room, me)
+	defer hall.LeaveRoom(data.Body.Room, me)
 	game, color := room.Ready(me)
 	if err := websocket.JSON.Send(ws, NewWSReady(color)); err != nil {
 		return
