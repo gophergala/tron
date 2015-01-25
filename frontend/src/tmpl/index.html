@@ -28,8 +28,10 @@
     var DOM = {};
     DOM.map         = document.getElementById('map');
     DOM.playerState = document.getElementById('player-state');
-  
-  
+    
+    
+    // mapState, playerColor, playerState ('wait', '5'..'1', 'play', 'won', 'lost')
+    
     var mapState = {
       orange: [
         [333,200], [333,300], [200,300], [200,100]
@@ -71,67 +73,79 @@
     drawMap(mapState);
     
     
-    // --- WebSockets -----------------------------------
-    var webSocketURL = 'ws://54.68.173.41/chatWS'
+    // --- SOCKETS SETUP -----------------------------------
+    
+    var webSocketURL = 'ws://localhost:8080/chatWS'
     var socket       = new WebSocket(webSocketURL);
     // var playerColor;
     // var playerState;
-    var playerColor = 'BLUE';  // tmp
-    var playerState = 'PLAY';  // tmp
+    var playerColor = 'blue';  // tmp
+    var playerState = 'play';  // tmp
     
     socket.onopen = function() {
-      socket.send('New player!');
+      socket.send(composeReadyEvent());
+      
+      window.onbeforeunload = function() {
+        socket.close();
+      }
     }
     
     socket.onmessage = function(event) {
       drawMap(event.mapState);
       
-      if (!playerColor) {
-        playerColor = event.playerColor;
-      }
-      
       if (playerState != event.playerState) {
         playerState = event.playerState;
         DOM.playerState.innerHTML = playerState;
+        
+        if (playerState == 'play') {
+          playerColor = event.playerColor;
+          document.onkeydown = sendKeyEvent;
+        }
       }
     }
     
-    document.onkeydown = sendEvent;
-    
-    function sendEvent(e) {
-      if (playerColor && playerState == 'PLAY') {
+    function sendKeyEvent(e) {
+      if (playerColor && playerState == 'play') {
         e = e || window.event;
         var direction;
         
         switch(e.keyCode) {
           case 37:
-            direction = 'L';
+            direction = 'l';
             break;
           case 38:
-            direction = 'U';
+            direction = 'u';
             break;
           case 39:
-            direction = 'R';
+            direction = 'r';
             break;
           case 40:
-            direction = 'D';
+            direction = 'd';
             break;
         }
         
         // socket.send(composeEvent(direction));
-        console.log(composeEvent(direction));  // tmp
+        console.log(composeKeyEvent(direction));  // tmp
         
       }      
     }
     
-    function composeEvent(direction) {
+    // --- COMPOSE EVENT MESSAGES -------------------------
+    
+    function composeReadyEvent() {
+      var msg = { type: 'ready' }
+      return JSON.stringify(msg);
+    }
+    
+    function composeKeyEvent(direction) {
       var msg = {
-        playerColor: playerColor,
+        type:        'key'
         direction:   direction
       }
       return JSON.stringify(msg);
     }
+    
   </script>
-  
+
 </body>
 </html>
