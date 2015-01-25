@@ -1,7 +1,7 @@
 package tron
 
 import (
-  "encoding/json"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/glog"
 	"golang.org/x/net/websocket"
 
 	"github.com/gophergala/tron/aws"
@@ -17,7 +18,7 @@ import (
 var (
 	assetsPath = os.Getenv("ASSETS_PATH")
 
-  hall = &Hall{m: make(map[string]*Room)}
+	hall = &Hall{m: make(map[string]*Room)}
 )
 
 func init() {
@@ -26,88 +27,110 @@ func init() {
 	http.HandleFunc("/chat", chat)
 	http.Handle("/chatWS", websocket.Handler(chatWS))
 
-  http.Handle("/Join", websocket.Handler(Join))
+	http.Handle("/Join", websocket.Handler(Join))
 	http.HandleFunc("/", root)
 }
 
-type wsData struct{
-  Type string
-  Body json.RawMessage
+type wsData struct {
+	Type string
+	Body json.RawMessage
+}
+
+type WSReady struct {
+	Type  string
+	Color Color
+}
+
+func NewWSReady(color Color) WSReady {
+	return WSReady{Type: "Ready", Color: color}
+}
+
+type WSRefreshMap struct {
+	Type  string
+	State map[Color][]Point
+}
+
+func NewWSRefreshMap(arena *Arena) WSRefreshMap {
+	return WSRefreshMap{Type: "RefreshMap", State: arena.Snakes}
+}
+
+type WSError struct {
+	Type string
+	Msg  string
+}
+
+func NewWSError(msg string) WSError {
+	return WSError{Type: "Error", Msg: msg}
 }
 
 func Join(ws *websocket.Conn) {
-  data := struct{
-    Room string
-  }{}
-  if err := websocket.JSON.Receive(ws, &data); err != nil {
-    return
-  }
-  me := &Player{
-    Arena: make(chan *Arena),
-    GameEnd: make(chan struct{}),
-  }
-  room, err := hall.EnterRoom(data.Room, me)
-  if err != nil {
-    return
-  }
-  defer hall.LeaveRoom(data.Room, me)
-  game, color := room.Ready(me)
-  if err := websocket.JSON.Send(ws, struct{Color Color}{Color: color}); err != nil {
-    return
-  }
+	data := struct {
+		Room string
+	}{}
+	if err := websocket.JSON.Receive(ws, &data); err != nil {
+		return
+	}
+	me := &Player{
+		Arena:   make(chan *Arena),
+		GameEnd: make(chan struct{}),
+	}
+	room, err := hall.EnterRoom(data.Room, me)
+	if err != nil {
+		websocket.JSON.Send(ws, NewWSError(err.Error()))
+		return
+	}
+	defer hall.LeaveRoom(data.Room, me)
+	game, color := room.Ready(me)
+	if err := websocket.JSON.Send(ws, NewWSReady(color)); err != nil {
+		return
+	}
 
-  readStopped := make(chan struct{})
-  go func() {
-    defer close(readStopped)
-    for {
-      data := wsData{}
-      if err := websocket.JSON.Receive(ws, &data); err != nil {
-        return
-      }
-      switch data.Type {
-      case "Leave":
-        return
-      case "Ready":
-        game, color = room.Ready(me)
-        resp := struct{
-          Type string
-          Color Color
-        }{
-          Type: "Ready",
-          Color: color,
-        }
-        if err := websocket.JSON.Send(ws, resp); err != nil {
-          return
-        }
-      case "Move":
-        body := struct{
-          Direction Direction
-        }{}
-        if err := json.Unmarshal(data.Body, &body); err != nil {
-          break
-        }
-        select {
-        case game.Move <- MoveCmd{Color: color, Direction: body.Direction}:
-        default:
-        }
-      }
-    }
-  }()
+	readStopped := make(chan struct{})
+	go func() {
+		defer close(readStopped)
+		for {
+			data := wsData{}
+			if err := websocket.JSON.Receive(ws, &data); err != nil {
+				return
+			}
+			switch data.Type {
+			case "Leave":
+				return
+			case "Ready":
+				game, color = room.Ready(me)
+				if err := websocket.JSON.Send(ws, NewWSReady(color)); err != nil {
+					return
+				}
+			case "Move":
+				body := struct {
+					Direction Direction
+				}{}
+				if err := json.Unmarshal(data.Body, &body); err != nil {
+					glog.Errorf("%v", err)
+					break
+				}
+				select {
+				case game.Move <- MoveCmd{Color: color, Direction: body.Direction}:
+				default:
+				}
+			}
+		}
+	}()
 
-  for {
-    select {
-    case arena := <-me.Arena:
-      if err := websocket.JSON.Send(ws, arena); err != nil {
-        return
-      }
-    case ge := <-me.GameEnd:
-      if err := websocket.JSON.Send(ws, ge); err != nil {
-        return
-      }
-    case <-readStopped:
-      return
-    }
-  }
+	for {
+		select {
+		case arena := <-me.Arena:
+			if err := websocket.JSON.Send(ws, NewWSRefreshMap(arena)); err != nil {
+				return
+			}
+		case ge := <-me.GameEnd:
+			if err := websocket.JSON.Send(ws, ge); err != nil {
+				return
+			}
+		case <-readStopped:
+			return
+		}
+	}
 }
 
 var chats = struct {
