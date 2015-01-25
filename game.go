@@ -154,6 +154,7 @@ func (a *Arena) Update(acts map[Color]Direction) {
 			p = Point{X: last.X + 1, Y: last.Y}
 		}
 
+		// Check for collision with the wall
 		if p.X <= 0 || p.X >= a.Size.X || p.Y <= 0 || p.Y >= a.Size.Y {
 			a.Losers = append(a.Losers, Loser{Color: color, CollideWith: ColorWall})
 			continue

@@ -51,7 +51,15 @@ type WSRefreshMap struct {
 }
 
 func NewWSRefreshMap(arena *Arena) WSRefreshMap {
-	return WSRefreshMap{Type: "RefreshMap", State: arena.Snakes}
+	canvas := make(map[Color][]Point)
+	for color, snake := range arena.Snakes {
+		canvas[color] = make([]Point, len(snake))
+		for i := 0; i < len(canvas[color]); i++ {
+			canvas[color][i].X = snake[i].X
+			canvas[color][i].Y = arena.Size.Y - snake[i].Y
+		}
+	}
+	return WSRefreshMap{Type: "RefreshMap", State: canvas}
 }
 
 type WSGameEnd struct {
