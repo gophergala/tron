@@ -210,12 +210,15 @@ type Room struct {
 	Players    map[*Player]struct{}
 	MaxPlayers int
 	Game       *Game
+
+	Watchers map[*Player]struct{}
 }
 
 func NewRoom(maxPlayers int) *Room {
 	r := Room{
 		Players:    make(map[*Player]struct{}),
 		MaxPlayers: maxPlayers,
+		Watchers:   make(map[*Player]struct{}),
 	}
 	return &r
 }
@@ -238,6 +241,7 @@ func (r *Room) Ready(player *Player) (*Game, Color) {
 	game.Players[color] = player
 
 	if len(game.Players) >= game.MinPlayers {
+		game.Watchers = r.Watchers
 		go game.Start()
 		r.Game = nil
 	}
@@ -280,10 +284,38 @@ func (h *Hall) LeaveRoom(name string, player *Player) {
 	}
 }
 
+func (h *Hall) WatchRoom(name string, player *Player) error {
+	h.Lock()
+	defer h.Unlock()
+	room, ok := h.m[name]
+	if !ok {
+		return fmt.Errorf("no such room")
+	}
+
+	room.Watchers[player] = struct{}{}
+
+	return nil
+}
+
+func (h *Hall) UnwatchRoom(name string, player *Player) error {
+	h.Lock()
+	defer h.Unlock()
+	room, ok := h.m[name]
+	if !ok {
+		return fmt.Errorf("no such room")
+	}
+
+	delete(room.Watchers, player)
+
+	return nil
+}
+
 type Game struct {
 	Players    map[Color]*Player
 	MinPlayers int
 	Move       chan MoveCmd
+
+	Watchers map[*Player]struct{}
 }
 
 func NewGame(minPlayers int) *Game {
@@ -317,10 +349,22 @@ func (g *Game) broadcastCountdown(cnt int) {
 		default:
 		}
 	}
+	for p, _ := range g.Watchers {
+		select {
+		case p.Countdown <- cnt:
+		default:
+		}
+	}
 }
 
 func (g *Game) broadcastArena(arena *Arena) {
 	for _, p := range g.Players {
+		select {
+		case p.Arena <- arena:
+		default:
+		}
+	}
+	for p, _ := range g.Watchers {
 		select {
 		case p.Arena <- arena:
 		default:
@@ -344,6 +388,12 @@ func (g *Game) broadcastGameEnd(arena *Arena) {
 	}
 
 	for _, p := range g.Players {
+		select {
+		case p.GameEnd <- winner:
+		default:
+		}
+	}
+	for p, _ := range g.Watchers {
 		select {
 		case p.GameEnd <- winner:
 		default:

@@ -106,7 +106,26 @@ func Join(ws *websocket.Conn) {
 	room, err := hall.EnterRoom(data.Body.Room, me)
 	if err != nil {
 		websocket.JSON.Send(ws, NewWSError(err.Error()))
-		return
+
+		// We are just a watcher
+		hall.WatchRoom(data.Body.Room, me)
+		defer hall.UnwatchRoom(data.Body.Room, me)
+		for {
+			select {
+			case cnt := <-me.Countdown:
+				if err := websocket.JSON.Send(ws, NewWSCountdown(cnt)); err != nil {
+					return
+				}
+			case arena := <-me.Arena:
+				if err := websocket.JSON.Send(ws, NewWSRefreshMap(arena)); err != nil {
+					return
+				}
+			case ge := <-me.GameEnd:
+				if err := websocket.JSON.Send(ws, NewWSGameEnd(ge)); err != nil {
+					return
+				}
+			}
+		}
 	}
 	defer hall.LeaveRoom(data.Body.Room, me)
 	game, color := room.Ready(me)
