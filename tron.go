@@ -36,13 +36,13 @@ type wsData struct {
 	Body json.RawMessage
 }
 
-type WSReady struct {
+type WSConnected struct {
 	Type  string
 	Color Color
 }
 
-func NewWSReady(color Color) WSReady {
-	return WSReady{Type: "Ready", Color: color}
+func NewWSConnected(color Color) WSConnected {
+	return WSConnected{Type: "Connected", Color: color}
 }
 
 type WSRefreshMap struct {
@@ -56,7 +56,7 @@ func NewWSRefreshMap(arena *Arena) WSRefreshMap {
 		canvas[color] = make([]Point, len(snake))
 		for i := 0; i < len(canvas[color]); i++ {
 			canvas[color][i].X = int(float64(snake[i].X) * arena.Ratio)
-			canvas[color][i].Y = int(float64(arena.Size.Y - snake[i].Y) * arena.Ratio)
+			canvas[color][i].Y = int(float64(arena.Size.Y-snake[i].Y) * arena.Ratio)
 		}
 	}
 	return WSRefreshMap{Type: "RefreshMap", State: canvas}
@@ -80,6 +80,15 @@ func NewWSError(msg string) WSError {
 	return WSError{Type: "Error", Msg: msg}
 }
 
+type WSCountdown struct {
+	Type string
+	Cnt  int
+}
+
+func NewWSCountdown(cnt int) WSCountdown {
+	return WSCountdown{Type: "Countdown", Cnt: cnt}
+}
+
 func Join(ws *websocket.Conn) {
 	data := struct {
 		Body struct {
@@ -90,8 +99,9 @@ func Join(ws *websocket.Conn) {
 		return
 	}
 	me := &Player{
-		Arena:   make(chan *Arena),
-		GameEnd: make(chan Color),
+		Arena:     make(chan *Arena, 32),
+		GameEnd:   make(chan Color, 32),
+		Countdown: make(chan int, 4),
 	}
 	room, err := hall.EnterRoom(data.Body.Room, me)
 	if err != nil {
@@ -100,7 +110,7 @@ func Join(ws *websocket.Conn) {
 	}
 	defer hall.LeaveRoom(data.Body.Room, me)
 	game, color := room.Ready(me)
-	if err := websocket.JSON.Send(ws, NewWSReady(color)); err != nil {
+	if err := websocket.JSON.Send(ws, NewWSConnected(color)); err != nil {
 		return
 	}
 
@@ -117,7 +127,7 @@ func Join(ws *websocket.Conn) {
 				return
 			case "Ready":
 				game, color = room.Ready(me)
-				if err := websocket.JSON.Send(ws, NewWSReady(color)); err != nil {
+				if err := websocket.JSON.Send(ws, NewWSConnected(color)); err != nil {
 					return
 				}
 			case "Move":
@@ -138,6 +148,10 @@ func Join(ws *websocket.Conn) {
 
 	for {
 		select {
+		case cnt := <-me.Countdown:
+			if err := websocket.JSON.Send(ws, NewWSCountdown(cnt)); err != nil {
+				return
+			}
 		case arena := <-me.Arena:
 			if err := websocket.JSON.Send(ws, NewWSRefreshMap(arena)); err != nil {
 				return
@@ -220,9 +234,9 @@ var rootTmpl = template.Must(template.ParseFiles(fmt.Sprintf("%s/tmpl/index.html
 func root(w http.ResponseWriter, r *http.Request) {
 	page := struct {
 		IP string
-		}{
-			IP: PublicIPv4(),
-		}
+	}{
+		IP: PublicIPv4(),
+	}
 	rootTmpl.Execute(w, page)
 }
 

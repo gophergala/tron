@@ -2,11 +2,11 @@ package tron
 
 import (
 	"fmt"
-  "math/rand"
+	"math/rand"
 	"sync"
 	"time"
-  
-  "github.com/golang/glog"
+
+	"github.com/golang/glog"
 )
 
 type Color string
@@ -53,14 +53,14 @@ type Arena struct {
 	Points map[Color]map[Point]struct{}
 	Losers []Loser
 
-	Size Point
-  Ratio float64
+	Size  Point
+	Ratio float64
 }
 
 const (
-  DefaultSizeX = 1000
-  DefaultSizeY = 600
-  DefaultSizeRatio = 8
+	DefaultSizeX     = 1000
+	DefaultSizeY     = 600
+	DefaultSizeRatio = 8
 )
 
 func NewArena(snakes map[Color][]Point, ratio float64) *Arena {
@@ -68,9 +68,9 @@ func NewArena(snakes map[Color][]Point, ratio float64) *Arena {
 		Snakes: snakes,
 		Points: make(map[Color]map[Point]struct{}),
 		Losers: make([]Loser, 0),
-    Ratio:  ratio,
+		Ratio:  ratio,
 	}
-  a.Size = Point{X: int(DefaultSizeX/a.Ratio), Y: int(DefaultSizeY/a.Ratio)}
+	a.Size = Point{X: int(DefaultSizeX / a.Ratio), Y: int(DefaultSizeY / a.Ratio)}
 	for color, s := range snakes {
 		a.Points[color] = make(map[Point]struct{})
 		for _, point := range s {
@@ -177,14 +177,14 @@ func (a *Arena) Update(acts map[Color]Direction) {
 		}
 
 		// Check collisions
-    shouldProfile := false
-    if rand.Intn(60) == 0 {
-      shouldProfile = true
-    }
-    var t int64
-    if shouldProfile {
-      t = time.Now().UnixNano()
-    }
+		shouldProfile := false
+		if rand.Intn(60) == 0 {
+			shouldProfile = true
+		}
+		var t int64
+		if shouldProfile {
+			t = time.Now().UnixNano()
+		}
 		for otherColor, points := range a.Points {
 			_, ok := points[p]
 			if ok {
@@ -192,16 +192,17 @@ func (a *Arena) Update(acts map[Color]Direction) {
 				break
 			}
 		}
-    if shouldProfile {
-      glog.Infof("collision time spent: %d ns", time.Now().UnixNano() - t)
-    }
+		if shouldProfile {
+			glog.Infof("collision time spent: %d ns", time.Now().UnixNano()-t)
+		}
 		a.Points[color][p] = struct{}{}
 	}
 }
 
 type Player struct {
-	Arena   chan *Arena
-	GameEnd chan Color // this is the color of the winner
+	Arena     chan *Arena
+	GameEnd   chan Color // this is the color of the winner
+	Countdown chan int
 }
 
 type Room struct {
@@ -295,7 +296,7 @@ func NewGame(minPlayers int) *Game {
 }
 
 func (g *Game) Ended(a *Arena) bool {
-	if len(g.Players)-1 == len(a.Losers) {
+	if len(g.Players)-1 <= len(a.Losers) {
 		return true
 	}
 	return false
@@ -307,6 +308,15 @@ func (g *Game) Ended(a *Arena) bool {
 		}
 	}
 	return false
+}
+
+func (g *Game) broadcastCountdown(cnt int) {
+	for _, p := range g.Players {
+		select {
+		case p.Countdown <- cnt:
+		default:
+		}
+	}
 }
 
 func (g *Game) broadcastArena(arena *Arena) {
@@ -349,13 +359,24 @@ var initColors = []Point{
 }
 
 func (g *Game) Start() {
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for cnt := 3; cnt >= 1; cnt -= 1 {
+			g.broadcastCountdown(cnt)
+			glog.Infof("Counting down %d", cnt)
+			<-time.After(time.Second)
+		}
+	}()
+
 	// Select initial direction
 	snakes := make(map[Color][]Point)
-  var ratio float64 = DefaultSizeRatio
+	var ratio float64 = DefaultSizeRatio
 	i := 0
 	for color, _ := range g.Players {
 		s := make([]Point, 2)
-		s[0] = Point{X: int(float64(initColors[i].X)/ratio), Y: int(float64(initColors[i].Y)/ratio)}
+		s[0] = Point{X: int(float64(initColors[i].X) / ratio), Y: int(float64(initColors[i].Y) / ratio)}
 		s[1] = Point{s[0].X + 1, s[0].Y}
 		snakes[color] = s
 		i += 1
@@ -374,6 +395,8 @@ InitDirt:
 			break InitDirt
 		}
 	}
+	wg.Wait()
+	g.broadcastCountdown(0)
 
 	// Game begins!
 	for {
