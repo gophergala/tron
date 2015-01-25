@@ -47,21 +47,21 @@
     //   ]
     // }
     // 
-    var drawMap = function(mapState) {
+    var drawMap = function(State) {
       var ctx = DOM.map.getContext('2d');
       
       ctx.lineWidth = 1;
       
-      for (var color in mapState) {
-        if (mapState.hasOwnProperty(color)) {
+      for (var color in State) {
+        if (State.hasOwnProperty(color)) {
           
           ctx.beginPath();
           ctx.strokeStyle = color;
           
-          var coords = mapState[color];
-          ctx.moveTo(coords[0][0], coords[0][1]);
-          for (i = 1; i < coords.length; i++) { 
-            ctx.lineTo(coords[i][0], coords[i][1]);
+          var points = State[color];
+          ctx.moveTo(points[0].X, points[0].Y);
+          for (i = 1; i < points.length; i++) { 
+            ctx.lineTo(points[i].X, points[i].Y);
           }
           
           ctx.stroke();
@@ -73,12 +73,10 @@
     
     // --- SOCKETS SETUP -----------------------------------
     
-    var webSocketURL = 'ws://localhost:8080/Join'
+    var webSocketURL = 'ws://localhost:8080/Join';
     var socket       = new WebSocket(webSocketURL);
-    var roomName     = 'tron'
-    
+    var roomName     = 'tron';
     var playerColor;
-    // var playerColor = 'blue';  // tmp
     
     socket.onopen = function() {
       socket.send(composeJoinMessage(roomName));
@@ -88,10 +86,11 @@
       }
     }
     
-    socket.onmessage = function(msgJSON) {
-      var msg = JSON.parse(msgJSON);
+    socket.onmessage = function(wsMsg) {
       
-      switch(msg.type) {
+      var msg = JSON.parse(wsMsg.data);
+      
+      switch(msg.Type) {
         case 'Ready':
           playerColor = msg.Color;
           // display which color belongs to the player
@@ -111,40 +110,43 @@
     }
     
     function sendKeyMessage(e) {
-        e = e || window.event;
-        var direction;
-        switch(e.keyCode) {
-          case 37:
-            direction = 'l';
-            break;
-          case 38:
-            direction = 'u';
-            break;
-          case 39:
-            direction = 'r';
-            break;
-          case 40:
-            direction = 'd';
-            break;
-        }
-        socket.send(composeKeyMessage(direction));
-        // console.log(composeKeyMessage(direction));  // tmp
+      e = e || window.event;
+      var direction;
+      switch(e.keyCode) {
+        case 37:
+          direction = 'l';
+          break;
+        case 38:
+          direction = 'u';
+          break;
+        case 39:
+          direction = 'r';
+          break;
+        case 40:
+          direction = 'd';
+          break;
+      }
+      socket.send(composeKeyMessage(direction));
     }
     
     // --- COMPOSE EVENT MESSAGES -------------------------
     
     function composeJoinMessage(roomName) {
       var msg = {
-        Type: 'Join' ,
-        Room: roomName
+        Type: 'Join',
+        Body: {
+          Room: roomName
+        }
       }
       return JSON.stringify(msg);
     }
     
     function composeKeyMessage(direction) {
       var msg = {
-        Type:      'Move' ,
-        Direction: direction
+        Type: 'Move' ,
+        Body: {
+          Direction: direction
+        }
       }
       return JSON.stringify(msg);
     }
