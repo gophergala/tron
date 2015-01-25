@@ -14,6 +14,10 @@
     }
     #info {
       float: left;
+      margin-left: 20px;
+    }
+    #connection, #color, #winner, #error {
+      margin-top: 20px;
     }
     #color, #winner, #error {
       font-size: 36px;
@@ -27,6 +31,7 @@
 <body>
   
   <canvas id="map" width="1000", height="600"></canvas>
+  
   <div id="info">
     <div id="connection"></div>
     <div id="color"></div>
@@ -37,11 +42,11 @@
   
   <script>
     var DOM = {};
-    DOM.map   = document.getElementById('map');
+    DOM.map        = document.getElementById('map');
     DOM.connection = document.getElementById('connection')
-    DOM.error = document.getElementById('error');
-    DOM.color = document.getElementById('color');
-    DOM.winner = document.getElementById('winner');
+    DOM.error      = document.getElementById('error');
+    DOM.color      = document.getElementById('color');
+    DOM.winner     = document.getElementById('winner');
     
     var page = {{.}};
     
@@ -52,7 +57,8 @@
       } else {
         newURL = "ws:";
       }
-      // Elastic Load Balancer does not support websockets, thus the host cannot be loc.host.
+      // Elastic Load Balancer does not support websockets, 
+      // thus the host cannot be loc.host.
       var host = page.IP;
       if (!host.match(/:/)) {
         if (loc.port != "80" && loc.port != "443") {
@@ -64,23 +70,8 @@
       return newURL;
     }
     
-    // mapState, playerColor, playerState ('wait', '5'..'1', 'play', 'won', 'lost')
-    
-    // var mapState = {
-    //   orange: [
-    //     [333,200], [333,300], [200,300], [200,100]
-    //   ],
-    //   blue : [
-    //     [666,200], [800,200], [800,50], [900,50]
-    //   ],
-    //   red: [
-    //     [333,400], [100, 400], [100, 580], [200, 580]
-    //   ],
-    //   green: [
-    //     [666,400], [850,400], [850,575], [950, 575]
-    //   ]
-    // }
-    // 
+    // --- MAP RENDERING -----------------------------------
+
     var drawMap = function(State) {
       var ctx = DOM.map.getContext('2d');
       
@@ -112,6 +103,45 @@
       ctx.clearRect(0, 0, DOM.map.width, DOM.map.height);
     }
     
+    // ---- DISPLAYING INFO -------------------------
+    
+    function clearEverything() {
+      clearMap();
+      DOM.color.innerHTML = '';
+      DOM.winner.innerHTML = '';
+      DOM.error.innerHTML = '';
+    }
+    
+    function displayConnectedMessage() {
+      DOM.connection.innerHTML = 'You are connected. Please wait for the game to start.'
+    }
+    
+    function displayCountdown(Cnt) {
+      clearMap();
+      var ctx = DOM.map.getContext('2d');
+      ctx.font = '100px sans-serif'
+      ctx.fillText(Cnt.toString(), DOM.map.width/2, DOM.map.height/2);
+    }
+    
+    function displayColor(Color) {
+      DOM.color.style.color = Color || 'black';
+      DOM.color.innerHTML = Color || 'You are a spectator';
+    }
+    
+    function displayWinner(Winner) {
+      if (Winner != "") {
+        DOM.winner.style.color = Winner;
+        DOM.winner.innerHTML   = Winner + ' won the game!'
+      }
+      else {
+        DOM.winner.style.color = 'black'
+        DOM.winner.innerHTML   = 'Everybody lost :('
+      }
+    }
+    
+    function displayErrorMessage(Msg) {
+      DOM.error.innerHTML = Msg;
+    }
     
     // --- SOCKETS SETUP -----------------------------------
     
@@ -158,43 +188,7 @@
       }
     }
     
-    function clearEverything() {
-      clearMap();
-      DOM.color.innerHTML = '';
-      DOM.winner.innerHTML = '';
-      DOM.error.innerHTML = '';
-    }
-    
-    function displayConnectedMessage() {
-      DOM.connection.innerHTML = 'You are connected. Please wait for the game to start.'
-    }
-    
-    function displayCountdown(Cnt) {
-      clearMap();
-      var ctx = DOM.map.getContext('2d');
-      ctx.font = '100px sans-serif'
-      ctx.fillText(Cnt.toString(), DOM.map.width/2, DOM.map.height/2);
-    }
-    
-    function displayColor(Color) {
-      DOM.color.style.color = Color;
-      DOM.color.innerHTML = Color;
-    }
-    
-    function displayWinner(Winner) {
-      if (Winner != "") {
-        DOM.winner.style.color = Winner;
-        DOM.winner.innerHTML   = Winner + ' won the game!'
-      }
-      else {
-        DOM.winner.style.color = 'black'
-        DOM.winner.innerHTML   = 'Everybody lost :('
-      }
-    }
-    
-    function displayErrorMessage(Msg) {
-      DOM.error.innerHTML = Msg;
-    }
+    // ---- KEY EVENTS -------------------------------
     
     function sendKeyMessage(e) {
       e = e || window.event;
@@ -240,7 +234,10 @@
     
     function composeReadyMessage() {
       var msg = {
-        Type: 'Ready'
+        Type: 'Ready',
+        Body: {
+          Color: playerColor
+        }
       }
       return JSON.stringify(msg);
     }
