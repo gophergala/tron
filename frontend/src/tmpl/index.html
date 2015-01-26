@@ -25,6 +25,17 @@
     #error {
       color: red;
     }
+
+   #controls {
+     float: left;
+     text-align: center;
+   } 
+    .ctlBtn {
+      width: 200px;
+      font-size: 40px;
+      margin-bottom: 80px;
+      margin-left: 120px;
+    }
   </style>
 </head>
 
@@ -41,6 +52,19 @@
     <div id="winner"></div>
     <div id="error"></div>
   </div>
+
+  <table id="controls">
+    <tr>
+      <td></td>
+      <td><button id="upBtn" class="ctlBtn">Up</button></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td><button id="leftBtn" class="ctlBtn">Left</button></td>
+      <td><button id="downBtn" class="ctlBtn">Down</button></td>
+      <td><button id="rightBtn" class="ctlBtn">Right</button></td>
+    </tr>
+  </table>
   
   
   <script>
@@ -189,6 +213,7 @@
           displayColor(playerColor);
           if (msg.Cnt > 0) displayCountdown(msg.Cnt);
           document.onkeydown = sendKeyMessage;
+          addLUDRCallbacks();
           break;
         case 'RefreshMap':
           drawMap(msg.State);
@@ -199,6 +224,7 @@
         case 'GameEnd':
           displayWinner(msg.Winner);
           socket.send(composeReadyMessage());
+          removeLUDRCallbacks();
           break;
       }
     }
@@ -224,7 +250,24 @@
       }
       socket.send(composeKeyMessage(direction));
     }
-    
+
+    function leftBtnCallback(e) { socket.send(composeKeyMessage('l')); }
+    function upBtnCallback(e) { socket.send(composeKeyMessage('u')); }
+    function downBtnCallback(e) { socket.send(composeKeyMessage('d')); }
+    function rightBtnCallback(e) { socket.send(composeKeyMessage('r')); }
+    function addLUDRCallbacks() {
+      document.querySelector("#leftBtn").addEventListener("click", leftBtnCallback);
+      document.querySelector("#upBtn").addEventListener("click", upBtnCallback);
+      document.querySelector("#downBtn").addEventListener("click", downBtnCallback);
+      document.querySelector("#rightBtn").addEventListener("click", rightBtnCallback);
+    }
+    function removeLUDRCallbacks() {
+      document.querySelector("#leftBtn").removeEventListener("click", leftBtnCallback);
+      document.querySelector("#upBtn").removeEventListener("click", upBtnCallback);
+      document.querySelector("#downBtn").removeEventListener("click", downBtnCallback);
+      document.querySelector("#rightBtn").removeEventListener("click", rightBtnCallback);
+    }
+
     // --- COMPOSE EVENT MESSAGES -------------------------
     
     function composeJoinMessage(roomName) {
